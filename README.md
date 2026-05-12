@@ -1,0 +1,1 @@
+# Intrumenta-o_Supervis-rio_T-rmico
