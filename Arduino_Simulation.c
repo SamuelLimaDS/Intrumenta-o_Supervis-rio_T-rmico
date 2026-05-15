@@ -1,73 +1,262 @@
-/*
-============================================================
-SIMULADOR DE TEMPERATURA PARA SUPERVISÓRIO PYTHON
-USF - Monitoramento Térmico de Processos
-============================================================
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <math.h>
 
-OBJETIVO:
-Simular um sensor LM35 sem precisar conectar componentes.
+// =====================================================
+// OLED
+// =====================================================
 
-O Arduino enviará temperaturas falsas pela serial,
-permitindo testar o supervisório Python.
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
 
-============================================================
-COMO USAR:
-1. Carregue este código no Arduino
-2. Descubra a porta COM
-3. No Python:
-   SERIAL_PORT = "COM3"   <-- alterar
-4. Execute o supervisório Python
-============================================================
-*/
+Adafruit_SSD1306 display(
+  SCREEN_WIDTH,
+  SCREEN_HEIGHT,
+  &Wire,
+  -1
+);
 
-float temperatura = 25.0;
+// =====================================================
+// NTC 10K
+// =====================================================
 
-// controle da simulação
-bool subindo = true;
+const int sensorNTC = A0;
+
+// divisor resistivo
+const float resistorFixo = 10000.0;
+
+// parâmetros NTC
+const float beta = 3950.0;
+const float tempNominal = 25.0;
+const float resistenciaNominal = 10000.0;
+
+// =====================================================
+// LEDs
+// =====================================================
+
+const int ledVerde = 8;
+const int ledAmarelo = 9;
+const int ledVermelho = 10;
+
+// =====================================================
+// BOTÃO
+// =====================================================
+
+const int botao = 4;
+
+// =====================================================
+// BUZZER
+// =====================================================
+
+const int buzzer = A3;
+
+// =====================================================
+// VARIÁVEIS
+// =====================================================
+
+int adc = 0;
+
+float resistenciaNTC = 0;
+float temperatura = 0;
+
+// =====================================================
 
 void setup()
 {
-    Serial.begin(9600);
+  Serial.begin(9600);
 
-    randomSeed(analogRead(0));
+  // ==========================================
+  // OLED
+  // ==========================================
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
+  {
+    while(true);
+  }
+
+  display.clearDisplay();
+
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+
+  display.setCursor(0,0);
+  display.println("USF");
+
+  display.setTextSize(1);
+  display.println("Monitoramento");
+
+  display.display();
+
+  delay(2000);
+
+  // ==========================================
+  // LEDs
+  // ==========================================
+
+  pinMode(ledVerde, OUTPUT);
+  pinMode(ledAmarelo, OUTPUT);
+  pinMode(ledVermelho, OUTPUT);
+
+  // ==========================================
+  // Botão
+  // ==========================================
+
+  pinMode(botao, INPUT_PULLUP);
+
+  // ==========================================
+  // Buzzer
+  // ==========================================
+
+  pinMode(buzzer, OUTPUT);
 }
+
+// =====================================================
 
 void loop()
 {
-    // =====================================================
-    // SIMULAÇÃO DE TEMPERATURA
-    // =====================================================
+  // ==========================================
+  // LEITURA ADC
+  // ==========================================
 
-    // sobe lentamente
-    if (subindo)
-    {
-        temperatura += random(1, 5) * 0.1;
-    }
-    else
-    {
-        temperatura -= random(1, 5) * 0.1;
-    }
+  adc = analogRead(sensorNTC);
 
-    // limites da simulação
-    if (temperatura >= 90)
-    {
-        subindo = false;
-    }
+  if(adc == 0)
+  {
+    adc = 1;
+  }
 
-    if (temperatura <= 30)
-    {
-        subindo = true;
-    }
+  // ==========================================
+  // RESISTÊNCIA NTC
+  // ==========================================
 
-    // pequeno ruído aleatório
-    temperatura += random(-2, 3) * 0.05;
+  resistenciaNTC =
+    resistorFixo *
+    ((1023.0 / adc) - 1.0);
 
-    // =====================================================
-    // ENVIA PARA PYTHON
-    // =====================================================
+  // ==========================================
+  // EQUAÇÃO BETA
+  // ==========================================
+
+  float steinhart;
+
+  steinhart = resistenciaNTC / resistenciaNominal;
+  steinhart = log(steinhart);
+  steinhart /= beta;
+  steinhart += 1.0 / (tempNominal + 273.15);
+  steinhart = 1.0 / steinhart;
+  steinhart -= 273.15;
+
+  temperatura = steinhart;
+
+  // ==========================================
+  // OLED
+  // ==========================================
+
+  display.clearDisplay();
+
+  display.setTextSize(1);
+
+  display.setCursor(0,0);
+  display.print("Temp:");
+
+  display.setTextSize(2);
+
+  display.setCursor(0,12);
+  display.print(temperatura,1);
+  display.print(" C");
+
+  // ==========================================
+  // EMERGÊNCIA
+  // ==========================================
+
+  if(digitalRead(botao) == LOW)
+  {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledAmarelo, LOW);
+    digitalWrite(ledVermelho, HIGH);
+
+    tone(buzzer, 1500);
+
+    display.setTextSize(2);
+
+    display.setCursor(0,40);
+    display.print("EMERG");
+
+    display.display();
 
     Serial.println(temperatura);
 
-    // intervalo de atualização
-    delay(1000);
+    delay(300);
+
+    return;
+  }
+
+  // ==========================================
+  // NORMAL
+  // ==========================================
+
+  if(temperatura < 30)
+  {
+    digitalWrite(ledVerde, HIGH);
+    digitalWrite(ledAmarelo, LOW);
+    digitalWrite(ledVermelho, LOW);
+
+    noTone(buzzer);
+
+    display.setTextSize(2);
+
+    display.setCursor(0,40);
+    display.print("NORMAL");
+  }
+
+  // ==========================================
+  // ALERTA
+  // ==========================================
+
+  else if(temperatura >= 30 && temperatura < 50)
+  {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledAmarelo, HIGH);
+    digitalWrite(ledVermelho, LOW);
+
+    noTone(buzzer);
+
+    display.setTextSize(2);
+
+    display.setCursor(0,40);
+    display.print("ALERTA");
+  }
+
+  // ==========================================
+  // CRÍTICO
+  // ==========================================
+
+  else
+  {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledAmarelo, LOW);
+    digitalWrite(ledVermelho, HIGH);
+
+    tone(buzzer, 1200);
+
+    display.setTextSize(2);
+
+    display.setCursor(0,40);
+    display.print("CRITICO");
+  }
+
+  // ==========================================
+  // UPDATE OLED
+  // ==========================================
+
+  display.display();
+
+  // ==========================================
+  // SERIAL PARA PYTHON
+  // ==========================================
+
+  Serial.println(temperatura);
+
+  delay(1000);
 }
