@@ -374,6 +374,11 @@ Monitoramento térmico de processos industriais
                 font-size:20px;
                 font-weight:bold;
             """)
+            while((serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)) == 0):
+                arduino = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+                time.sleep(2)
+            
+            serial_thread()
 
         # ====================================================
         # ALERTAS
