@@ -4,6 +4,14 @@
 #include <math.h>
 
 // =====================================================
+// PWM
+// =====================================================
+
+const int peltierPin = 3;
+
+int pwmValor = 0;
+
+// =====================================================
 // OLED
 // =====================================================
 
@@ -65,6 +73,16 @@ float temperatura = 0;
 void setup()
 {
   Serial.begin(9600);
+  // ==========================================
+  // PWM
+  // ==========================================
+
+    pinMode(peltierPin, OUTPUT);
+
+    analogWrite(peltierPin, 0);
+
+    Serial.println("Controle PWM Peltier");
+    Serial.println("Digite valor de 0 a 255");
 
   // ==========================================
   // OLED
@@ -259,4 +277,31 @@ void loop()
   Serial.println(temperatura);
 
   delay(1000);
+
+    // =========================================
+    // RECEBE SERIAL PWM PELTIER
+    // =========================================
+
+    if (Serial.available())
+    {
+        String entrada = Serial.readStringUntil('\n');
+
+        entrada.trim();
+
+        int valor = entrada.toInt();
+
+        // Limita entre 0 e 255
+        valor = constrain(valor, 0, 255);
+
+        pwmValor = valor;
+
+        analogWrite(peltierPin, pwmValor);
+
+        // =====================================
+        // FEEDBACK
+        // =====================================
+
+        Serial.print("PWM Atual: ");
+        Serial.println(pwmValor);
+    }
 }
