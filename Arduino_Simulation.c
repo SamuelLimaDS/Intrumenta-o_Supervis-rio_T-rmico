@@ -26,7 +26,7 @@ Adafruit_SSD1306 display(
 );
 
 // =====================================================
-// NTC 10K
+// NTC 10K & AMOSTRAGEM
 // =====================================================
 
 const int sensorNTC = A0;
@@ -38,6 +38,9 @@ const float resistorFixo = 10000.0;
 const float beta = 3950.0;
 const float tempNominal = 25.0;
 const float resistenciaNominal = 10000.0;
+
+// Quantidade de amostras para a média (Filtro Anti-Ruído)
+const int NUM_AMOSTRAS = 15; 
 
 // =====================================================
 // LEDs
@@ -134,14 +137,24 @@ void setup()
 void loop()
 {
   // ==========================================
-  // LEITURA ADC
+  // LEITURA ADC COM AMOSTRAGEM (MÉDIA)
   // ==========================================
 
-  adc = analogRead(sensorNTC);
+  long somaADC = 0;
+
+  // Realiza múltiplas leituras para estabilizar o valor
+  for(int i = 0; i < NUM_AMOSTRAS; i++)
+  {
+    somaADC += analogRead(sensorNTC);
+    delay(2); // Pequeno tempo para o ADC do Arduino estabilizar
+  }
+
+  // Calcula a média das leituras
+  adc = somaADC / NUM_AMOSTRAS;
 
   if(adc == 0)
   {
-    adc = 1;
+    adc = 1; // Evita divisão por zero no cálculo da resistência
   }
 
   // ==========================================
