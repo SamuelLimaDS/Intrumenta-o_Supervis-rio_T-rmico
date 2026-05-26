@@ -6,7 +6,7 @@
 // =====================================================
 // PWM
 // =====================================================
-const int peltierPin = 3;
+const int peltierPin = 5;
 int pwmValor = 0;
 
 // =====================================================
@@ -18,9 +18,11 @@ int pwmValor = 0;
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // =====================================================
-// NTC 10K & AMOSTRAGEM
+// CONFIGURAÇÕES DOS SENSORES & AMOSTRAGEM
 // =====================================================
 const int sensorNTC = A0;
+const int sensorLM35 = A1; // Pino adicionado para o LM35
+
 const float resistorFixo = 10000.0;
 const float beta = 3950.0;
 const float tempNominal = 25.0;
@@ -39,9 +41,14 @@ const int botaoAumentar = 13;
 const int buzzer = A3;
 
 // Variáveis Globais
-int adc = 0;
+int adc = 0;          // ADC do NTC
+int adcLm35 = 0;      // ADC do LM35
 float resistenciaNTC = 0;
-float temperatura = 0;
+float temperatura = 0;   // Temperatura do NTC
+float tempLm35 = 0;      // Temperatura do LM35
+
+// Protótipo da função para evitar incompatibilidades de compilação
+void enviarDadosSerial(int statusEmergencia);
 
 void setup() {
   Serial.begin(9600);
@@ -59,7 +66,7 @@ void setup() {
   display.setCursor(0,0);
   display.println("USF");
   display.setTextSize(1);
-  display.println("Monitoramento");
+  display.println("Monitoramento Dual");
   display.display();
   delay(2000);
 
@@ -92,24 +99,44 @@ void lerSensorNTC() {
   temperatura = steinhart;
 }
 
+void lerSensorLM35() {
+  long somaADC = 0;
+  for(int i = 0; i < NUM_AMOSTRAS; i++) {
+    somaADC += analogRead(sensorLM35);
+    delay(2);
+  }
+  
+  adcLm35 = somaADC / NUM_AMOSTRAS;
+  
+  // LM35 fornece 10mV por grau Celsius (Tensão = ADC * 5.0 / 1023)
+  float voltagem = (adcLm35 * 5.0) / 1023.0;
+  tempLm35 = voltagem * 100.0;
+}
+
 void desenharTemperaturaBaseOLED() {
   display.clearDisplay();
   display.setTextSize(1);
+  display.setTextColor(WHITE);
+  
+  // Exibição compacta das duas temperaturas
   display.setCursor(0,0);
-  display.print("Temp:");
-  display.setTextSize(2);
-  display.setCursor(0,12);
+  display.print("NTC : ");
   display.print(temperatura, 1);
   display.print(" C");
   
-  display.setTextSize(1);
-  display.setCursor(80,0);
+  display.setCursor(0,12);
+  display.print("LM35: ");
+  display.print(tempLm35, 1);
+  display.print(" C");
+  
+  display.setCursor(85,0);
   display.print("PWM:");
-  display.setCursor(80,12);
+  display.setCursor(85,12);
   display.print(pwmValor);
 }
 
 void atualizarStatusTemperatura() {
+  // A lógica de alertas locais continuará usando o NTC como referência primária
   if(temperatura <= 25) {
     digitalWrite(ledVerde, LOW);
     digitalWrite(ledAmarelo, HIGH);
@@ -157,27 +184,22 @@ void tratarBotoesPWM() {
   }
 }
 
-void verificarEmergencia() {
+bool verificarEmergencia() {
   if(digitalRead(botaoEmergencia) == HIGH) {
-    // 1. Zera o PWM e desliga a Peltier por segurança
     pwmValor = 0;
     analogWrite(peltierPin, pwmValor);
 
-    // 2. Acende os LEDs de alerta
     digitalWrite(ledVerde, HIGH);
     digitalWrite(ledAmarelo, HIGH);
     digitalWrite(ledVermelho, HIGH);
 
-    // 3. Liga o Buzzer
     tone(buzzer, 1500);
 
-    // 4. Atualiza o Display OLED local
     display.setTextSize(2);
     display.setCursor(0,40);
     display.print("EMERG");
     display.display();
     
-    // 5. Envia os dados para o Python avisando que a emergência está ATIVA (1)
     enviarDadosSerial(1); 
     delay(300);
     return true; 
@@ -185,12 +207,15 @@ void verificarEmergencia() {
   return false; 
 }
 
-// Agora a função recebe o status da emergência (0 para normal, 1 para ativa)
 void enviarDadosSerial(int statusEmergencia) {
-  // Envia no formato: Temperatura,ADC,PWM,Emergencia
+  // Novo formato de transmissão: TempNTC,ADCNTC,TempLM35,ADCLM35,PWM,Emergencia
   Serial.print(temperatura);
   Serial.print(",");
   Serial.print(adc);
+  Serial.print(",");
+  Serial.print(tempLm35);
+  Serial.print(",");
+  Serial.print(adcLm35);
   Serial.print(",");
   Serial.print(pwmValor);
   Serial.print(",");
@@ -199,9 +224,9 @@ void enviarDadosSerial(int statusEmergencia) {
 
 void loop() {
   lerSensorNTC();
+  lerSensorLM35();
   desenharTemperaturaBaseOLED();
 
-  // Se estiver em emergência, o loop para aqui e envia o status "1"
   if (verificarEmergencia()) {
     return; 
   }
@@ -210,7 +235,6 @@ void loop() {
   tratarBotoesPWM();
   display.display();
 
-  // Loop normal envia o status de emergência como "0"
   enviarDadosSerial(0);
   delay(100);
 }

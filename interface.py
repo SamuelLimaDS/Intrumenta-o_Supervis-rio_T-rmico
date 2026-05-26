@@ -1,9 +1,13 @@
+# ============================================================
+# ARQUIVO: interface.py
+# OBJETIVO: Apenas desenhar a tela (FrontEnd). Nenhuma lógica aqui!
+# ============================================================
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout,
     QGridLayout, QFrame
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QPixmap  # Mantido o QPixmap para gerenciar a imagem
+from PyQt5.QtGui import QFont, QPixmap
 import pyqtgraph as pg
 
 class Card(QFrame):
@@ -30,7 +34,7 @@ class Card(QFrame):
 class InterfaceSupervisorio(QWidget):
     def __init__(self, temp_min, temp_max):
         super().__init__()
-        self.setWindowTitle("SUPERVISÓRIO USF")
+        self.setWindowTitle("SUPERVISÓRIO USF - DUAL SENSOR")
         self.setGeometry(100, 100, 1600, 900)
         self.setStyleSheet("background-color:#050505; color:white;")
 
@@ -41,51 +45,37 @@ class InterfaceSupervisorio(QWidget):
 
     def criar_cabecalho(self):
         topo_layout = QHBoxLayout()
-        
-        # Estrutura vertical para agrupar a linha do título e o subtítulo
         titulos_layout = QVBoxLayout()
-        
-        # === LINHA DO TÍTULO PRINCIPAL + LOGO USF ===
         linha_titulo_layout = QHBoxLayout()
-        linha_titulo_layout.setAlignment(Qt.AlignVertical_Mask) # Alinha as bases textuais
+        linha_titulo_layout.setAlignment(Qt.AlignVertical_Mask)
 
         titulo = QLabel("MONITORAMENTO TÉRMICO DO FORNO")
         titulo.setFont(QFont("Arial", 26, QFont.Bold))
         linha_titulo_layout.addWidget(titulo)
         
-        # Criamos o espaço e carregamos a imagem da logo ao lado do título
         self.label_logo = QLabel()
-        # FORÇA O FUNDO DO COMPONENTE A FICAR TRANSPARENTE
         self.label_logo.setStyleSheet("background-color: transparent; margin-left: 20px;")
         pixmap = QPixmap("logo_usf.png")
         
         if not pixmap.isNull():
-            # Redimensionado para 45px de altura para casar com o tamanho da fonte 26 do título
             pixmap_redimensionado = pixmap.scaledToHeight(100, Qt.SmoothTransformation)
             self.label_logo.setPixmap(pixmap_redimensionado)
-            self.label_logo.setStyleSheet("margin-left: 50px;") # Pequeno recuo para desgrudar do texto
+            self.label_logo.setStyleSheet("margin-left: 50px;")
         else:
             self.label_logo.setText("[ USF ]")
             self.label_logo.setStyleSheet("color: #00ff66; font-weight: bold; font-size: 26px; margin-left: 20px;")
             
         linha_titulo_layout.addWidget(self.label_logo)
-        linha_titulo_layout.addStretch() # Empurra o resto para manter o alinhamento
-        
-        # Adiciona a linha contendo o (Título + Logo) no bloco de títulos
+        linha_titulo_layout.addStretch()
         titulos_layout.addLayout(linha_titulo_layout)
         
-        # === SUBTÍTULO ===
         subtitulo = QLabel("Samuel, Murilo, Leonardo, Stephanie, Thiago, Filipe, Gabriel, Everton")
         subtitulo.setStyleSheet("color:#00ff66; font-size:18px; margin-top: 1px;")
         titulos_layout.addWidget(subtitulo)
         
-        # Insere o bloco completo de títulos no lado esquerdo do topo
         topo_layout.addLayout(titulos_layout)
-        
-        # Este addStretch cria o vão livre entre o bloco esquerdo (Títulos/Logo) e o bloco direito (Status)
         topo_layout.addStretch()
 
-        # Status Online/Offline na extrema direita
         self.label_status = QLabel("● INICIANDO...")
         self.label_status.setStyleSheet("color:gray; font-size:20px; font-weight:bold;")
         topo_layout.addWidget(self.label_status)
@@ -95,12 +85,14 @@ class InterfaceSupervisorio(QWidget):
     def criar_grid_de_cards(self, temp_min, temp_max):
         grid = QGridLayout()
 
-        # 1. CARD: TEMPERATURA
-        card_temp = Card("TEMPERATURA ATUAL")
-        self.temp_label = QLabel("0.0 °C")
-        self.temp_label.setAlignment(Qt.AlignCenter)
-        self.temp_label.setStyleSheet("color:white; font-size:48px; font-weight:bold; border: none;")
-        card_temp.layout().addWidget(self.temp_label)
+        # 1. CARD: TEMPERATURAS ATUAIS (Modificado para exibir ambos os sensores)
+        card_temp = Card("TEMPERATURAS ATUAIS")
+        self.temp_ntc_label = QLabel("NTC: 0.0 °C")
+        self.temp_ntc_label.setStyleSheet("color:#00ff66; font-size:28px; font-weight:bold; border: none;")
+        self.temp_lm35_label = QLabel("LM35: 0.0 °C")
+        self.temp_lm35_label.setStyleSheet("color:#00bfff; font-size:28px; font-weight:bold; border: none;")
+        card_temp.layout().addWidget(self.temp_ntc_label)
+        card_temp.layout().addWidget(self.temp_lm35_label)
         grid.addWidget(card_temp, 0, 0)
 
         # 2. CARD: STATUS
@@ -119,28 +111,33 @@ class InterfaceSupervisorio(QWidget):
         card_alerta.layout().addWidget(self.alerta)
         grid.addWidget(card_alerta, 2, 0)
 
-        # 4. CARD: GRÁFICO
-        card_grafico = Card("HISTÓRICO DE TEMPERATURA")
+        # 4. CARD: GRÁFICO (Modificado para duas curvas com legenda)
+        card_grafico = Card("HISTÓRICO COMPARATIVO DE TEMPERATURA")
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setBackground("#111111")
         self.plot_widget.showGrid(x=True, y=True)
         self.plot_widget.setLabel('left', 'Temperatura (°C)')
-        self.plot_widget.setLabel('bottom', 'Tempo')
-        self.plot_widget.setYRange(0, 150)
-        self.curve = self.plot_widget.plot(pen=pg.mkPen("#00ff66", width=3))
+        self.plot_widget.setLabel('bottom', 'Amostras')
+        self.plot_widget.setYRange(0, 100)
+        self.plot_widget.addLegend()
+        
+        # Linha Verde para o NTC, Linha Ciano/Azul claro para o LM35
+        self.curve_ntc = self.plot_widget.plot(name="NTC 10K", pen=pg.mkPen("#00ff66", width=3))
+        self.curve_lm35 = self.plot_widget.plot(name="LM35", pen=pg.mkPen("#00bfff", width=3))
+        
         card_grafico.layout().addWidget(self.plot_widget)
         grid.addWidget(card_grafico, 0, 1, 3, 2)
 
-        # 5. CARD: DADOS DO SENSOR
-        card_sensor = Card("DADOS DO SENSOR")
-        self.sensor_info = QLabel("Sensor: NTC 10K\nResolução ADC: 10 bits\nComunicação: Serial")
-        self.sensor_info.setStyleSheet("font-size:18px; color:white; border: none;")
+        # 5. CARD: DADOS DO SENSOR (Modificado para exibir dois ADCs)
+        card_sensor = Card("SINAIS DE CAMPO (ADC)")
+        self.label_adc_ntc = QLabel("ADC NTC 10K: 0")
+        self.label_adc_ntc.setStyleSheet("font-size:18px; color:#00ff66; font-weight:bold; border: none;")
         
-        self.label_adc = QLabel("Valor AD: 0")
-        self.label_adc.setStyleSheet("font-size:20px; color:#00ff66; font-weight:bold; border: none; margin-top: 10px;")
+        self.label_adc_lm35 = QLabel("ADC LM35: 0")
+        self.label_adc_lm35.setStyleSheet("font-size:18px; color:#00bfff; font-weight:bold; border: none; margin-top: 5px;")
         
-        card_sensor.layout().addWidget(self.sensor_info)
-        card_sensor.layout().addWidget(self.label_adc)
+        card_sensor.layout().addWidget(self.label_adc_ntc)
+        card_sensor.layout().addWidget(self.label_adc_lm35)
         grid.addWidget(card_sensor, 3, 0)
 
         # 6. CARD: PWM
