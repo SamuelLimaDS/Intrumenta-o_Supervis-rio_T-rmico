@@ -123,7 +123,7 @@ def atualizar_interface():
     elif TEMP_1 < temperatura_ntc <= TEMP_2:
         tela.status_processo.setText("TEMPERATURA MÉDIA")
         tela.status_processo.setStyleSheet("color:yellow; font-size:36px; font-weight:bold; border: none;")
-        tela.alerta.setText("FORNO ESQUENTANDO")
+        tela.alerta.setText("TEMPERATURA MEDIA - FIQUE ATENTO")
         tela.alerta.setStyleSheet("color:white; font-size:20px; border: none;")
     else:
         tela.status_processo.setText("ALTA TEMPERATURA")

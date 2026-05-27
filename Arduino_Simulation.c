@@ -115,7 +115,7 @@ void lerSensorLM35() {
 
 void desenharTemperaturaBaseOLED() {
   display.clearDisplay();
-  display.setTextSize(1);
+  display.setTextSize(1.8);
   display.setTextColor(WHITE);
   
   // Exibição compacta das duas temperaturas
@@ -124,15 +124,11 @@ void desenharTemperaturaBaseOLED() {
   display.print(temperatura, 1);
   display.print(" C");
   
-  display.setCursor(0,12);
+  display.setCursor(0,15);
   display.print("LM35: ");
   display.print(tempLm35, 1);
   display.print(" C");
-  
-  display.setCursor(85,0);
-  display.print("PWM:");
-  display.setCursor(85,12);
-  display.print(pwmValor);
+
 }
 
 void atualizarStatusTemperatura() {
@@ -144,7 +140,7 @@ void atualizarStatusTemperatura() {
     noTone(buzzer);
     display.setTextSize(2);
     display.setCursor(0,40);
-    display.print("NORMAL");
+    display.print("AMBIENTE");
   }
   else if(temperatura > 25 && temperatura <= 30) {
     digitalWrite(ledVerde, HIGH);
@@ -161,7 +157,7 @@ void atualizarStatusTemperatura() {
     digitalWrite(ledVermelho, LOW);
     display.setTextSize(2);
     display.setCursor(0,40);
-    display.print("CRITICO");
+    display.print("QUENTE");
   }
 }
 
@@ -169,11 +165,11 @@ void tratarBotoesPWM() {
   bool alterouPWM = false;
 
   if (digitalRead(botaoDiminuir) == HIGH) {
-    pwmValor -= 5;
+    pwmValor -= 15;
     alterouPWM = true;
   }
   if (digitalRead(botaoAumentar) == HIGH) {
-    pwmValor += 5;
+    pwmValor += 15;
     alterouPWM = true;
   }
 
@@ -193,7 +189,7 @@ bool verificarEmergencia() {
     digitalWrite(ledAmarelo, HIGH);
     digitalWrite(ledVermelho, HIGH);
 
-    tone(buzzer, 1500);
+    tone(buzzer, 12000);
 
     display.setTextSize(2);
     display.setCursor(0,40);
